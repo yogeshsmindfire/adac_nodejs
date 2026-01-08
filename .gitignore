@@ -1,5 +1,8 @@
 node_modules/
 yamls/
 ollama/
-*.svg
 dist/
+
+# output assets/log file to be ignored
+*.svg
+*.log

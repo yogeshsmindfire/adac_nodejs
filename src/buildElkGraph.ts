@@ -1,73 +1,41 @@
 import { AdacConfig, ElkNode, ElkEdge } from "./types.js";
 import path from "path";
+import fs from "fs";
+import { fileURLToPath } from 'url';
 
-// Mapping from subtype/type to Icon File Name (relative to src/assets)
-const ICON_MAP: Record<string, string> = {
-  // Compute
-  "ecs-fargate": "Architecture-Service-Icons_07312025/Arch_Containers/48/Arch_Amazon-Elastic-Container-Service_48.svg",
-  "eks": "Architecture-Service-Icons_07312025/Arch_Containers/48/Arch_Amazon-Elastic-Kubernetes-Service_48.svg",
-  "lambda": "Architecture-Service-Icons_07312025/Arch_Compute/48/Arch_AWS-Lambda_48.svg",
-  "ec2": "Resource-Icons_07312025/Res_Compute/Res_Amazon-EC2_Instance_48.svg", // Added EC2 generic
-  
-  // App types (generic)
-  "frontend": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_Client_48_Light.svg",
-  "backend": "Architecture-Service-Icons_07312025/Arch_Compute/48/Arch_AWS-Lambda_48.svg",
-  "microservice": "Architecture-Service-Icons_07312025/Arch_Compute/48/Arch_AWS-Lambda_48.svg", // Default for Generic MS
-  "api": "Architecture-Service-Icons_07312025/Arch_Networking-Content-Delivery/48/Arch_Amazon-API-Gateway_48.svg",
-  "database": "Architecture-Service-Icons_07312025/Arch_Database/48/Arch_Amazon-RDS_48.svg",
-  
-  // Specific Microservices (Overrides based on ID or Name logic could go here, but map keys are types)
-  // We will handle specific IDs in the code below
-  
-  // Database
-  "rds-postgres": "Architecture-Service-Icons_07312025/Arch_Database/48/Arch_Amazon-RDS_48.svg",
-  "rds-aurora-postgres": "Architecture-Service-Icons_07312025/Arch_Database/48/Arch_Amazon-Aurora_48.svg",
-  "dynamodb": "Architecture-Service-Icons_07312025/Arch_Database/48/Arch_Amazon-DynamoDB_48.svg",
-  "elasticache-redis": "Architecture-Service-Icons_07312025/Arch_Database/48/Arch_Amazon-ElastiCache_48.svg",
+// Load Icon Map
+// We use fs.readFileSync to avoid TS import issues with JSON for now and ensure runtime correctness
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  // Networking
-  "vpc": "Architecture-Service-Icons_07312025/Arch_Networking-Content-Delivery/48/Arch_Amazon-Virtual-Private-Cloud_48.svg",
-  "subnet": "Resource-Icons_07312025/Res_Networking-Content-Delivery/Res_Amazon-VPC_Subnet-Private_48.svg", // Fallback, usually container
-  "application-load-balancer": "Resource-Icons_07312025/Res_Networking-Content-Delivery/Res_Elastic-Load-Balancing_Application-Load-Balancer_48.svg",
-  "alb": "Resource-Icons_07312025/Res_Networking-Content-Delivery/Res_Elastic-Load-Balancing_Application-Load-Balancer_48.svg",
-  "nat-gateway": "Resource-Icons_07312025/Res_Networking-Content-Delivery/Res_Amazon-VPC_NAT-Gateway_48.svg",
-  "api-gateway-rest": "Architecture-Service-Icons_07312025/Arch_Networking-Content-Delivery/48/Arch_Amazon-API-Gateway_48.svg",
-  "cdn": "Architecture-Service-Icons_07312025/Arch_Networking-Content-Delivery/48/Arch_Amazon-CloudFront_48.svg",
-  "cloudfront": "Architecture-Service-Icons_07312025/Arch_Networking-Content-Delivery/48/Arch_Amazon-CloudFront_48.svg",
-  "internet": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_Internet_48_Light.svg",
-  
-  // Integration
-  "sqs": "Architecture-Service-Icons_07312025/Arch_App-Integration/48/Arch_Amazon-Simple-Queue-Service_48.svg",
-  "sns": "Architecture-Service-Icons_07312025/Arch_App-Integration/48/Arch_Amazon-Simple-Notification-Service_48.svg",
-  "kinesis-streams": "Architecture-Service-Icons_07312025/Arch_Analytics/48/Arch_Amazon-Kinesis-Data-Streams_48.svg",
-  
-  // Storage
-  "s3": "Architecture-Service-Icons_07312025/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.svg",
-  
-  // Security & Management
-  "security-group": "Architecture-Service-Icons_07312025/Arch_Security-Identity-Compliance/48/Arch_AWS-Identity-and-Access-Management_48.svg",
-  "waf": "Architecture-Service-Icons_07312025/Arch_Security-Identity-Compliance/48/Arch_AWS-WAF_48.svg",
-  "guardduty": "Architecture-Service-Icons_07312025/Arch_Security-Identity-Compliance/48/Arch_Amazon-GuardDuty_48.svg",
-  "secrets-manager": "Architecture-Service-Icons_07312025/Arch_Security-Identity-Compliance/48/Arch_AWS-Secrets-Manager_48.svg",
-  "cloudwatch": "Architecture-Service-Icons_07312025/Arch_Management-Governance/48/Arch_Amazon-CloudWatch_48.svg",
+// Adjust path to find mappings from compiled dist or src
+// If we are in src/ buildElkGraph.ts, mappings is ./mappings
+// If we are in dist/src/ buildElkGraph.js, mappings might not be copied!
+// We should rely on absolute path or robust lookup.
+// For this environment, we know the project root.
+const PROJECT_ROOT = path.resolve(__dirname, "../.."); // Assuming dist/src -> dist -> root OR src -> root (No, src -> root is ..)
+// Let's try to find it relative to this file.
+const MAPPING_PATH = path.join(__dirname, "mappings", "icon-map.json");
+const ASSETS_PATH = path.join(__dirname, "assets");
 
-  // DevTools
-  "codepipeline": "Architecture-Service-Icons_07312025/Arch_Developer-Tools/48/Arch_AWS-CodePipeline_48.svg",
-  "codebuild": "Architecture-Service-Icons_07312025/Arch_Developer-Tools/48/Arch_AWS-CodeBuild_48.svg",
-  
-  // User/Client
-  "user": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_User_48_Light.svg",
-  "users": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_Users_48_Light.svg",
-  "client": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_Client_48_Light.svg",
-  "mobile": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_Mobile-client_48_Light.svg",
-  
-  // Domain Specific (manual overrides)
-  "payment": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_Multimedia_48_Light.svg",
-  "notification": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_Email_48_Light.svg",
-  "email": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_Email_48_Light.svg",
-  "analytics": "Resource-Icons_07312025/Res_General-Icons/Res_48_Light/Res_Metrics_48_Light.svg",
-  "ml": "Architecture-Service-Icons_07312025/Arch_Artificial-Intelligence/48/Arch_Amazon-SageMaker_48.svg",
-};
+let ICON_MAP: Record<string, string> = {};
+
+try {
+  // Try loading from local src (dev) or relative
+  if (fs.existsSync(MAPPING_PATH)) {
+     ICON_MAP = JSON.parse(fs.readFileSync(MAPPING_PATH, "utf8"));
+  } else {
+     // Try looking in src if we are in dist
+     const srcMapping = path.resolve(__dirname, "../../src/mappings/icon-map.json");
+      if (fs.existsSync(srcMapping)) {
+         ICON_MAP = JSON.parse(fs.readFileSync(srcMapping, "utf8"));
+      } else {
+          console.warn("Warning: Could not find icon-map.json");
+      }
+  }
+} catch (e) {
+  console.error("Failed to load icon-map.json", e);
+}
 
 // Colors matching AWS Diagrams
 const STYLES = {
@@ -81,6 +49,55 @@ const STYLES = {
   app: { type: "node", style: "app" },
 };
 
+function normalizeKey(key: string): string {
+    return key.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Pre-compute normalized map for fuzzy lookup
+const NORMALIZED_MAP = new Map<string, string>();
+Object.keys(ICON_MAP).forEach(k => {
+    NORMALIZED_MAP.set(normalizeKey(k), k);
+    // Also add partials if meaningful?
+    // e.g. "Amazon S3" -> "amazons3"
+    // "Lambda" -> "lambda"
+});
+
+// Manual aliases for common short codes to full AWS names (if not auto-resolved)
+const ALIASES: Record<string, string> = {
+    "ec2": "Amazon Elastic Compute Cloud (Amazon EC2)",
+    "s3": "Amazon Simple Storage Service (Amazon S3)",
+    "lambda": "AWS Lambda",
+    "vpc": "Amazon Virtual Private Cloud (Amazon VPC)",
+    "dynamodb": "Amazon DynamoDB",
+    "rds": "Amazon Relational Database Service (Amazon RDS)",
+    "sqs": "Amazon Simple Queue Service (Amazon SQS)",
+    "sns": "Amazon Simple Notification Service (Amazon SNS)",
+    "cloudfront": "Amazon CloudFront",
+    "alb": "Application Load Balancer",
+    "elb": "Elastic Load Balancing",
+    "apigateway": "Amazon API Gateway",
+    "eks": "Amazon Elastic Kubernetes Service (Amazon EKS)",
+    "ecs": "Amazon Elastic Container Service (Amazon ECS)",
+    "fargate": "AWS Fargate",
+    "kinesis": "Amazon Kinesis",
+    "glue": "AWS Glue",
+    "athena": "Amazon Athena",
+    "redshift": "Amazon Redshift",
+    "route53": "Amazon Route 53",
+    "iam": "AWS Identity and Access Management (IAM)",
+    "cloudwatch": "Amazon CloudWatch",
+    "cloudtrail": "AWS CloudTrail",
+    "config": "AWS Config",
+    "kms": "AWS Key Management Service (AWS KMS)",
+    "secretsmanager": "AWS Secrets Manager",
+    "waf": "AWS WAF",
+    "shield": "AWS Shield",
+    "codepipeline": "AWS CodePipeline",
+    "codebuild": "AWS CodeBuild",
+    "codecommit": "AWS CodeCommit",
+    "codedeploy": "AWS CodeDeploy"
+};
+
 export function buildElkGraph(adac: AdacConfig): ElkNode {
   const nodesMap = new Map<string, ElkNode>();
   const nodes: ElkNode[] = [];
@@ -91,11 +108,62 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
 
   // Helper to get helper map
   const getIconPath = (key: string) => {
-    if (ICON_MAP[key]) {
-      return path.resolve("d:/Pre-training/adac/src/assets", ICON_MAP[key]);
+    if (!key) return undefined;
+    
+    // 1. Direct Lookup
+    if (ICON_MAP[key]) return resolveAssetPath(ICON_MAP[key]);
+    
+    const lowerKey = normalizeKey(key);
+
+    // 2. Alias Lookup
+    if (ALIASES[lowerKey] && ICON_MAP[ALIASES[lowerKey]]) {
+        return resolveAssetPath(ICON_MAP[ALIASES[lowerKey]]);
     }
+    
+    // 3. Normalized Lookup
+    if (NORMALIZED_MAP.has(lowerKey)) {
+        return resolveAssetPath(ICON_MAP[NORMALIZED_MAP.get(lowerKey)!]);
+    }
+    
+    // 4. Fuzzy / Substring Lookup
+    // Find key containing the search term or vice versa
+    for (const [nKey, originalKey] of NORMALIZED_MAP.entries()) {
+        if (nKey.includes(lowerKey) || lowerKey.includes(nKey)) {
+            // Bias towards exact word matches if possible, but for now take first
+             return resolveAssetPath(ICON_MAP[originalKey]);
+        }
+    }
+
+    // 5. Fallback for generics
+    if (lowerKey.includes("database") || lowerKey.includes("db")) return resolveAssetPath(ICON_MAP["Database"]);
+    if (lowerKey.includes("user")) return resolveAssetPath(ICON_MAP["User"]);
+    if (lowerKey.includes("client")) return resolveAssetPath(ICON_MAP["Client"]);
+    
     return undefined;
   };
+
+  const resolveAssetPath = (relativePath: string) => {
+      // relativePath is like "aws-icons/image.png"
+      // We need absolute path.
+      // Try to find assets dir.
+      // If running from src: src/assets
+      // If running from dist: src/assets (we aren't copying assets to dist usually)
+      
+      // Let's assume standard layout:
+      // Project/src/assets
+      // Project/dist/src/buildElkGraph.js
+      
+      // We can try to resolve from CWD or __dirname
+      const possiblePath = path.resolve(__dirname, "../../src/assets", relativePath); 
+      // check if exists
+      if (fs.existsSync(possiblePath)) return possiblePath;
+      
+      const possiblePath2 = path.resolve(__dirname, "../assets", relativePath);
+      if (fs.existsSync(possiblePath2)) return possiblePath2;
+      
+      // Fallback relative to CWD
+      return path.resolve(process.cwd(), "src/assets", relativePath);
+  }
 
   const getServiceType = (service: any): string => {
     return service.subtype || service.service || service.type || "unknown";
@@ -110,11 +178,11 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
 
      // Check technology for generic matches
      const tech = (app.technology || "").toLowerCase();
-     if (tech.includes("react") || tech.includes("vue") || tech.includes("angular")) return getIconPath("frontend");
-     if (tech.includes("node") || tech.includes("java") || tech.includes("python")) return getIconPath("backend");
+     if (tech.includes("react") || tech.includes("vue") || tech.includes("angular")) return getIconPath("Front-End Web & Mobile");
+     if (tech.includes("node") || tech.includes("java") || tech.includes("python")) return getIconPath("Compute");
 
      // Fallbacks
-     return getIconPath(app.type) || getIconPath("microservice");
+     return getIconPath(app.type) || getIconPath("Application");
   };
 
   // 1. Create Nodes for Applications
@@ -194,7 +262,7 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
          const aiIcon = getIconPath(service.ai_tags.icon);
          if (aiIcon) iconPath = aiIcon;
       }
-      if (!iconPath) iconPath = getIconPath("backend"); // Fallback
+      if (!iconPath) iconPath = getIconPath("General resource icon"); // Fallback
 
       const node: ElkNode = {
         id: service.id,
@@ -402,13 +470,13 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
     [conn.from, conn.to].forEach(endpointId => {
       if (!nodesMap.has(endpointId)) {
         // Smart Implicit Node Detection
-        let icon = getIconPath("internet"); // Default
+        let icon = getIconPath("Internet"); // Default
         const lowerId = endpointId.toLowerCase();
         
-        if (lowerId.includes("user")) icon = getIconPath("user");
-        else if (lowerId.includes("client")) icon = getIconPath("client");
-        else if (lowerId.includes("frontend")) icon = getIconPath("frontend");
-        else if (lowerId.includes("backend")) icon = getIconPath("backend");
+        if (lowerId.includes("user")) icon = getIconPath("User");
+        else if (lowerId.includes("client")) icon = getIconPath("Client");
+        else if (lowerId.includes("frontend")) icon = getIconPath("Application"); // Fallback
+        else if (lowerId.includes("backend")) icon = getIconPath("Compute");
 
         const implicitNode: ElkNode = {
           id: endpointId,

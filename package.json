@@ -1,26 +1,33 @@
 {
   "name": "adac",
   "version": "1.0.0",
-  "description": "",
+  "description": "ADAC - AWS Diagram Generator",
   "type": "module",
   "main": "dist/src/diagram.js",
   "bin": {
     "adac": "dist/bin/adac-diagram.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "adac",
+    "aws",
+    "diagram",
+    "ollama"
+  ],
+  "author": "Yogesh Sharma",
   "license": "ISC",
   "dependencies": {
+    "adm-zip": "^0.5.16",
+    "axios": "^1.13.2",
     "commander": "^14.0.2",
     "elkjs": "^0.11.0",
     "fs-extra": "^11.3.3",
     "js-yaml": "^4.1.1"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/fs-extra": "^11.0.4",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.0.3",

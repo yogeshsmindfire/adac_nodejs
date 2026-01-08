@@ -40,7 +40,11 @@ export async function renderSvg(graph: ElkNode): Promise<string> {
     try {
       const data = fs.readFileSync(params.path);
       const b64 = data.toString('base64');
-      return `data:image/svg+xml;base64,${b64}`;
+      const ext = params.path.split('.').pop()?.toLowerCase();
+      let mime = "image/svg+xml";
+      if (ext === "png") mime = "image/png";
+      else if (ext === "jpg" || ext === "jpeg") mime = "image/jpeg";
+      return `data:${mime};base64,${b64}`;
     } catch (e) {
       console.warn(`Failed to read icon: ${params.path}`, e);
       return null;
