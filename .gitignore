@@ -1,6 +1,5 @@
 node_modules/
 yamls/
-assets/
 ollama/
 *.svg
 dist/
