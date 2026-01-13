@@ -2,6 +2,7 @@
 import ELK from "elkjs";
 import { ElkNode } from "./types.js";
 import fs from "fs-extra";
+import path from "path";
 
 const CSS_STYLES = `
   .aws-container { fill: none; stroke-width: 2px; }
@@ -26,13 +27,11 @@ const CSS_STYLES = `
 export async function renderSvg(graph: ElkNode): Promise<string> {
   const elk = new (ELK as any)();
 
-  // Recursively layout? ELK handles hierarchy if structure is passed.
+  // ELK Layout
   const layout = await elk.layout(graph) as ElkNode;
 
   const width = layout.width || 800;
   const height = layout.height || 600;
-
-  let svgContent = "";
 
   // Helper to read Icon as Base64
   const getIconDataUri = (params: { path?: string }) => {
@@ -51,8 +50,97 @@ export async function renderSvg(graph: ElkNode): Promise<string> {
     }
   };
 
-  // Recursive Render Function
-  const renderNode = (node: ElkNode, indent: number = 0) => {
+  // 1. Map all Nodes to their Absolute Positions
+  const nodeAbsPos = new Map<string, { x: number, y: number }>();
+  
+  const mapNodePositions = (node: ElkNode, offsetX: number, offsetY: number) => {
+      const currentX = offsetX + (node.x || 0);
+      const currentY = offsetY + (node.y || 0);
+      
+      nodeAbsPos.set(node.id, { x: currentX, y: currentY });
+      
+      if (node.children) {
+          node.children.forEach(child => mapNodePositions(child, currentX, currentY));
+      }
+  };
+  
+  // Start mapping from root. 
+  // Root node 'layout' itself:
+  // Usually layout.x/y are 0 if it's the root, but let's respect them.
+  // The edges in 'root' container are relative to 'root'.
+  mapNodePositions(layout, 0, 0);
+
+  // 2. Collect and Transform Edges
+  const allEdges: any[] = [];
+  const processedEdgeIds = new Set<string>();
+  
+  const collectAndTransformEdges = (node: ElkNode) => {
+      if (node.edges) {
+          node.edges.forEach(edge => {
+             // Prevent duplicates if ELK includes edges in multiple places
+             if (edge.id && processedEdgeIds.has(edge.id)) return;
+             if (edge.id) processedEdgeIds.add(edge.id);
+
+             const containerId = (edge as any).container;
+             let containerOffset = { x: 0, y: 0 };
+             
+             // Resolve Container Offset
+             if (containerId && nodeAbsPos.has(containerId)) {
+                 containerOffset = nodeAbsPos.get(containerId)!;
+             } else {
+                 // Fallback strategies
+                 if (nodeAbsPos.has(node.id)) {
+                     // If explicit container is missing, assume relative to current node
+                     containerOffset = nodeAbsPos.get(node.id)!;
+                 }
+             }
+
+             // Clone and Transform coordinates to Global Space
+             const globalEdge = JSON.parse(JSON.stringify(edge));
+             if (globalEdge.sections) {
+                 globalEdge.sections.forEach((sec: any) => {
+                     sec.startPoint.x += containerOffset.x;
+                     sec.startPoint.y += containerOffset.y;
+                     sec.endPoint.x += containerOffset.x;
+                     sec.endPoint.y += containerOffset.y;
+                     if (sec.bendPoints) {
+                         sec.bendPoints.forEach((bp: any) => {
+                             bp.x += containerOffset.x;
+                             bp.y += containerOffset.y;
+                         });
+                     }
+                 });
+             }
+             allEdges.push(globalEdge);
+          });
+      }
+      if (node.children) {
+          node.children.forEach(child => collectAndTransformEdges(child));
+      }
+  };
+
+  collectAndTransformEdges(layout);
+
+
+  // 2. Render Edges (Background Layer)
+  let edgesOutput = "";
+  allEdges.forEach(edge => {
+     if (edge.sections) {
+       edge.sections.forEach((sec: any) => {
+         let d = `M ${sec.startPoint.x} ${sec.startPoint.y}`;
+         if (sec.bendPoints) {
+            sec.bendPoints.forEach((bp: any) => { d += ` L ${bp.x} ${bp.y}`; });
+         }
+         d += ` L ${sec.endPoint.x} ${sec.endPoint.y}`;
+         edgesOutput += `<path d="${d}" class="aws-edge" marker-end="url(#arrow)" />`;
+       });
+     }
+  });
+
+
+  // 3. Render Nodes (Foreground Layer)
+  // Recursive Render Function (No internal edge rendering)
+  const renderNode = (node: ElkNode) => {
     let output = "";
     const nodeX = node.x || 0;
     const nodeY = node.y || 0;
@@ -63,8 +151,7 @@ export async function renderSvg(graph: ElkNode): Promise<string> {
     const props = node.properties || {};
     const label = node.labels && node.labels.length > 0 ? node.labels[0].text : "";
 
-    // Group for this node (moves local coordinate system? No, ELK gives absolute or relative coords? 
-    // ELK gives RELATIVE coords to parent. So we must use transform.)
+    // Group for this node
     output += `<g transform="translate(${nodeX}, ${nodeY})">`;
 
     // Label Rendering Helper
@@ -83,7 +170,18 @@ export async function renderSvg(graph: ElkNode): Promise<string> {
 
     const renderLabel = (text: string, x: number, y: number, cssClass: string, maxWidth: number) => {
        if (!text) return "";
-       return `<text x="${x}" y="${y}" class="${cssClass}">${escapeXml(text)}</text>`;
+       
+       // Improved truncation: Average char width ~8px
+       const charWidth = 8; 
+       const maxChars = Math.floor(maxWidth / charWidth);
+       
+       let displayText = text;
+       // Only truncate if text is suspiciously long relative to width
+       if (text.length > maxChars + 2) { 
+         displayText = text.substring(0, maxChars).trim() + "...";
+       }
+       
+       return `<text x="${x}" y="${y}" class="${cssClass}">${escapeXml(displayText)}</text>`;
     };
 
     if (props.type === "container") {
@@ -91,16 +189,28 @@ export async function renderSvg(graph: ElkNode): Promise<string> {
       let rectClass = "aws-container";
       if (props.cssClass) rectClass += ` ${props.cssClass}`;
       
-      output += `<rect width="${nodeW}" height="${nodeH}" class="${rectClass}" rx="4" ry="4" opacity="0.9"/>`;
+      // Use fill-opacity: 0 would mean transparent, but we want empty fill? 
+      // class aws-container has fill: none.
+      // But we added opacity="0.9" in original code.
+      // Let's stick to CSS class mainly.
+      output += `<rect width="${nodeW}" height="${nodeH}" class="${rectClass}" rx="4" ry="4" stroke-width="2" />`;
       
       // Label (Top Left for containers)
       output += renderLabel(label, 10, 25, "aws-label", nodeW - 40);
 
-      // Render Icon for container if exists (e.g. VPC icon at corner)
-      if (props.iconPath) {
+      // Render Icon for container if exists (check for duplicate child icon)
+      let shouldRenderIcon = true;
+      if (props.iconPath && node.children) {
+         const parentIcon = props.iconPath;
+         const hasChildWithSameIcon = node.children.some(child => {
+            return child.properties?.iconPath && child.properties.iconPath === parentIcon;
+         });
+         if (hasChildWithSameIcon) shouldRenderIcon = false;
+      }
+
+      if (props.iconPath && shouldRenderIcon) {
         const iconUri = getIconDataUri({ path: props.iconPath });
         if (iconUri) {
-          // Small icon for container header
           output += `<image href="${iconUri}" x="${nodeW - 28}" y="5" width="24" height="24" />`;
         }
       }
@@ -108,7 +218,7 @@ export async function renderSvg(graph: ElkNode): Promise<string> {
       // Render Children
       if (node.children) {
         node.children.forEach(child => {
-          output += renderNode(child, indent + 1);
+          output += renderNode(child);
         });
       }
 
@@ -119,8 +229,10 @@ export async function renderSvg(graph: ElkNode): Promise<string> {
       const iy = 10;
       const textY = 65;
 
+      // Draw background for nodes (white) to cover any edges passing *behind* them
+      output += `<rect width="${nodeW}" height="${nodeH}" fill="white" stroke="none" />`; 
+
       if (iconUri) {
-          // Stable fixed layout for 80x80 nodes
           const ix = (nodeW - 48) / 2;
           output += `<image href="${iconUri}" x="${ix}" y="${iy}" width="48" height="48" />`;
       } else {
@@ -129,14 +241,16 @@ export async function renderSvg(graph: ElkNode): Promise<string> {
       }
 
       // Label (Bottom center)
-      // Split label if likely to be long
       const words = label.split(" ");
       let line1 = label;
       let line2 = "";
-      if (words.length > 2) {
+      // Smart split
+      if (words.length > 2 || label.length > 16) {
          const mid = Math.ceil(words.length / 2);
-         line1 = words.slice(0, mid).join(" ");
-         line2 = words.slice(mid).join(" ");
+         if (words.length > 1) {
+             line1 = words.slice(0, mid).join(" ");
+             line2 = words.slice(mid).join(" ");
+         }
       }
       
       output += `<text x="${nodeW / 2}" y="${textY}" text-anchor="middle" class="aws-label-sm">${escapeXml(line1)}</text>`;
@@ -145,32 +259,12 @@ export async function renderSvg(graph: ElkNode): Promise<string> {
       }
     }
     
-    // Edges (Edges in ELK are usually at the level where both nodes exist, or root. 
-    // If ELK "include children" is on, edges might be localized. 
-    // For now, assume top-level edges or edges in current children list.
-    // Actually ELK outputs edges at the level they are defined in graph structure.
-    if (node.edges) {
-       node.edges.forEach(edge => {
-         if (edge.sections) {
-           edge.sections.forEach(sec => {
-             // Points assume relative to this container.
-             let d = `M ${sec.startPoint.x} ${sec.startPoint.y}`;
-             if (sec.bendPoints) {
-                sec.bendPoints.forEach(bp => { d += ` L ${bp.x} ${bp.y}`; });
-             }
-             d += ` L ${sec.endPoint.x} ${sec.endPoint.y}`;
-             
-             output += `<path d="${d}" class="aws-edge" marker-end="url(#arrow)" />`;
-           });
-         }
-       });
-    }
-
     output += `</g>`;
     return output;
   };
 
-  svgContent += renderNode(layout);
+  const nodesOutput = renderNode(layout);
+  const svgContent = nodesOutput + edgesOutput;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" style="width: 100%; height: auto; max-width: 100%; background-color: white;">
     <defs>
