@@ -1,0 +1,88 @@
+# ADAC - AWS Diagram Generator
+
+ADAC (AWS Diagram As Code) is a powerful Node.js-based CLI tool designed to generate professional AWS architecture diagrams programmatically from YAML configuration files. It leverages the precision of `elkjs` for graph layout algorithms and outputs high-quality SVG diagrams, making it easy to version control and automate your architecture documentation.
+
+## 📂 Folder Structure
+
+```
+adac_nodejs/
+├── bin/                # CLI entry point scripts
+│   └── adac-diagram.ts # Main CLI command definition
+├── src/                # Core application source code
+│   ├── buildElkGraph.ts # Logic to transform ADAC model to ELK graph
+│   ├── diagram.ts       # Main orchestrator function
+│   ├── mappings/        # Icon mapping definitions and assets
+│   │   ├── definition.yaml # Raw ADAC definition file
+│   │   └── icon-map.json   # Processed icon mapping
+│   ├── parseAdac.ts     # YAML parsing logic
+│   ├── renderSvg.ts     # SVG rendering engine
+│   ├── setupIcons.ts    # Utility to download and setup AWS icons
+│   └── types.ts        # TypeScript type definitions
+├── yamls/              # Example and usage YAML input files
+│   ├── adac_example_webapp.yaml
+│   ├── aws.adac.yaml
+│   └── ...
+├── output_diagrams/    # Directory for generated SVG outputs
+├── dist/               # Compiled JavaScript files (generated after build)
+└── package.json        # Project manifest and dependencies
+```
+
+## 🛠 Tools & Technologies Used
+
+- **Runtime**: Node.js
+- **Language**: TypeScript
+- **CLI Framework**: [Commander.js](https://github.com/tj/commander.js)
+- **Graph Layout**: [elkjs](https://github.com/kieler/elkjs) (Eclipse Layout Kernel for JavaScript)
+- **YAML Parser**: [js-yaml](https://github.com/nodeca/js-yaml)
+- **File System**: [fs-extra](https://github.com/jprichardson/node-fs-extra)
+- **Utilities**:
+  - `adm-zip`: For handling icon asset archives.
+  - `axios`: For downloading external resources (icons).
+
+## 📚 Reference Links
+
+- **ELK Layout**: [https://www.eclipse.org/elk/](https://www.eclipse.org/elk/)
+- **Node.js**: [https://nodejs.org/](https://nodejs.org/)
+- **Blogging/Context**: Originally inspired by "Diagrams as Code" concepts (e.g., similar to the Python `diagrams` library or Structurizr).
+
+## 🚀 Setup & Installation Guide
+
+### Prerequisites
+- Ensure you have **Node.js** (v16+ recommended) installed on your machine.
+
+### 1. Clone & Install
+Navigate to the project directory and install the dependencies:
+
+```bash
+npm install
+```
+
+### 2. Build the Project
+Compile the TypeScript source code into JavaScript:
+
+```bash
+npm run build
+```
+
+This will generate the `dist/` directory containing the executable code.
+
+### 3. Setup Icons (First Time Only)
+If the project requires AWS icons that are not present, you may need to run the setup script (if applicable/available via npm scripts or direct execution) to download and extract them into `src/assets`.
+
+### 4. Running the Tool
+You can generate a diagram using the built CLI script.
+
+**Syntax:**
+```bash
+node dist/bin/adac-diagram.js diagram <path-to-yaml-file> -o <path-to-output-svg>
+```
+
+**Example:**
+Generate a diagram for the example web app:
+
+```bash
+node dist/bin/adac-diagram.js diagram yamls/adac_example_webapp.yaml -o output_diagrams/webapp.svg
+```
+
+### 5. Development
+For development, you can modify files in `src/` and rebuild using `npm run build`.
