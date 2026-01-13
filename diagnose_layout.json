@@ -823,12 +823,8 @@
   "edges": [
     {
       "id": "external-to-api-gateway",
-      "sources": [
-        "external-clients"
-      ],
-      "targets": [
-        "api-gateway-rest"
-      ],
+      "sources": ["external-clients"],
+      "targets": ["api-gateway-rest"],
       "labels": [
         {
           "text": "api-call",
@@ -857,12 +853,8 @@
     },
     {
       "id": "apigateway-to-kong",
-      "sources": [
-        "api-gateway-rest"
-      ],
-      "targets": [
-        "api-gateway"
-      ],
+      "sources": ["api-gateway-rest"],
+      "targets": ["api-gateway"],
       "labels": [
         {
           "text": "api-call",
@@ -891,12 +883,8 @@
     },
     {
       "id": "kong-to-user-service",
-      "sources": [
-        "api-gateway"
-      ],
-      "targets": [
-        "user-service"
-      ],
+      "sources": ["api-gateway"],
+      "targets": ["user-service"],
       "labels": [
         {
           "text": "api-call",
@@ -935,12 +923,8 @@
     },
     {
       "id": "kong-to-product-service",
-      "sources": [
-        "api-gateway"
-      ],
-      "targets": [
-        "product-service"
-      ],
+      "sources": ["api-gateway"],
+      "targets": ["product-service"],
       "labels": [
         {
           "text": "api-call",
@@ -969,12 +953,8 @@
     },
     {
       "id": "kong-to-order-service",
-      "sources": [
-        "api-gateway"
-      ],
-      "targets": [
-        "order-service"
-      ],
+      "sources": ["api-gateway"],
+      "targets": ["order-service"],
       "labels": [
         {
           "text": "api-call",
@@ -1013,12 +993,8 @@
     },
     {
       "id": "user-service-to-aurora",
-      "sources": [
-        "user-service"
-      ],
-      "targets": [
-        "rds-aurora-users"
-      ],
+      "sources": ["user-service"],
+      "targets": ["rds-aurora-users"],
       "labels": [
         {
           "text": "database-query",
@@ -1057,12 +1033,8 @@
     },
     {
       "id": "product-service-to-dynamodb",
-      "sources": [
-        "product-service"
-      ],
-      "targets": [
-        "dynamodb-products"
-      ],
+      "sources": ["product-service"],
+      "targets": ["dynamodb-products"],
       "labels": [
         {
           "text": "database-query",
@@ -1101,12 +1073,8 @@
     },
     {
       "id": "order-service-to-rds",
-      "sources": [
-        "order-service"
-      ],
-      "targets": [
-        "rds-postgres-orders"
-      ],
+      "sources": ["order-service"],
+      "targets": ["rds-postgres-orders"],
       "labels": [
         {
           "text": "database-query",
@@ -1145,12 +1113,8 @@
     },
     {
       "id": "order-service-to-payment",
-      "sources": [
-        "order-service"
-      ],
-      "targets": [
-        "payment-service"
-      ],
+      "sources": ["order-service"],
+      "targets": ["payment-service"],
       "labels": [
         {
           "text": "api-call",
@@ -1189,12 +1153,8 @@
     },
     {
       "id": "order-to-sqs",
-      "sources": [
-        "order-service"
-      ],
-      "targets": [
-        "sqs-orders"
-      ],
+      "sources": ["order-service"],
+      "targets": ["sqs-orders"],
       "labels": [
         {
           "text": "message-publish",
@@ -1241,12 +1201,8 @@
     },
     {
       "id": "payment-to-sns",
-      "sources": [
-        "payment-service"
-      ],
-      "targets": [
-        "sns-events"
-      ],
+      "sources": ["payment-service"],
+      "targets": ["sns-events"],
       "labels": [
         {
           "text": "message-publish",
@@ -1285,12 +1241,8 @@
     },
     {
       "id": "sns-to-notification",
-      "sources": [
-        "sns-events"
-      ],
-      "targets": [
-        "notification-service"
-      ],
+      "sources": ["sns-events"],
+      "targets": ["notification-service"],
       "labels": [
         {
           "text": "message-consume",
@@ -1329,12 +1281,8 @@
     },
     {
       "id": "services-to-redis",
-      "sources": [
-        "user-service"
-      ],
-      "targets": [
-        "elasticache-redis-cluster"
-      ],
+      "sources": ["user-service"],
+      "targets": ["elasticache-redis-cluster"],
       "labels": [
         {
           "text": "cache-read",
@@ -1363,12 +1311,8 @@
     },
     {
       "id": "analytics-to-kinesis",
-      "sources": [
-        "order-service"
-      ],
-      "targets": [
-        "kinesis-analytics"
-      ],
+      "sources": ["order-service"],
+      "targets": ["kinesis-analytics"],
       "labels": [
         {
           "text": "stream-write",
@@ -1407,12 +1351,8 @@
     },
     {
       "id": "kinesis-to-worker",
-      "sources": [
-        "kinesis-analytics"
-      ],
-      "targets": [
-        "analytics-worker"
-      ],
+      "sources": ["kinesis-analytics"],
+      "targets": ["analytics-worker"],
       "labels": [
         {
           "text": "stream-read",
@@ -1441,12 +1381,8 @@
     },
     {
       "id": "product-to-ml",
-      "sources": [
-        "product-service"
-      ],
-      "targets": [
-        "recommendation-ml"
-      ],
+      "sources": ["product-service"],
+      "targets": ["recommendation-ml"],
       "labels": [
         {
           "text": "api-call",
@@ -1485,12 +1421,8 @@
     },
     {
       "id": "order-to-s3",
-      "sources": [
-        "order-service"
-      ],
-      "targets": [
-        "s3-documents"
-      ],
+      "sources": ["order-service"],
+      "targets": ["s3-documents"],
       "labels": [
         {
           "text": "file-upload",

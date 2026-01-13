@@ -48,9 +48,11 @@ adac_nodejs/
 ## 🚀 Setup & Installation Guide
 
 ### Prerequisites
+
 - Ensure you have **Node.js** (v16+ recommended) installed on your machine.
 
 ### 1. Clone & Install
+
 Navigate to the project directory and install the dependencies:
 
 ```bash
@@ -58,6 +60,7 @@ npm install
 ```
 
 ### 2. Build the Project
+
 Compile the TypeScript source code into JavaScript:
 
 ```bash
@@ -67,12 +70,15 @@ npm run build
 This will generate the `dist/` directory containing the executable code.
 
 ### 3. Setup Icons (First Time Only)
+
 If the project requires AWS icons that are not present, you may need to run the setup script (if applicable/available via npm scripts or direct execution) to download and extract them into `src/assets`.
 
 ### 4. Running the Tool
+
 You can generate a diagram using the built CLI script.
 
 **Syntax:**
+
 ```bash
 node dist/bin/adac-diagram.js diagram <path-to-yaml-file> -o <path-to-output-svg>
 ```
@@ -85,4 +91,5 @@ node dist/bin/adac-diagram.js diagram yamls/adac_example_webapp.yaml -o output_d
 ```
 
 ### 5. Development
+
 For development, you can modify files in `src/` and rebuild using `npm run build`.

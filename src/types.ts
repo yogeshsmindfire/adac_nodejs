@@ -18,7 +18,9 @@ export interface AdacService {
   name?: string;
   description?: string;
   subnets?: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config?: any; // shorthand used in some yamls
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   configuration?: any; // full name used in others
   ai_tags?: {
     icon?: string;
@@ -71,6 +73,7 @@ export interface ElkEdge {
   id: string;
   sources: string[];
   targets: string[];
+  container?: string;
   labels?: { text: string }[];
   sections?: {
     startPoint: { x: number; y: number };

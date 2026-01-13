@@ -387,12 +387,8 @@
   "edges": [
     {
       "id": "user-to-cdn",
-      "sources": [
-        "external-users"
-      ],
-      "targets": [
-        "cloudfront-cdn"
-      ],
+      "sources": ["external-users"],
+      "targets": ["cloudfront-cdn"],
       "labels": [
         {
           "text": "cdn-origin",
@@ -421,12 +417,8 @@
     },
     {
       "id": "cdn-to-s3",
-      "sources": [
-        "cloudfront-cdn"
-      ],
-      "targets": [
-        "s3-frontend"
-      ],
+      "sources": ["cloudfront-cdn"],
+      "targets": ["s3-frontend"],
       "labels": [
         {
           "text": "cdn-origin",
@@ -455,12 +447,8 @@
     },
     {
       "id": "frontend-to-alb",
-      "sources": [
-        "web-frontend"
-      ],
-      "targets": [
-        "alb-api"
-      ],
+      "sources": ["web-frontend"],
+      "targets": ["alb-api"],
       "labels": [
         {
           "text": "api-call",
@@ -499,12 +487,8 @@
     },
     {
       "id": "alb-to-ecs",
-      "sources": [
-        "alb-api"
-      ],
-      "targets": [
-        "ecs-api"
-      ],
+      "sources": ["alb-api"],
+      "targets": ["ecs-api"],
       "labels": [
         {
           "text": "load-balancing",
@@ -533,12 +517,8 @@
     },
     {
       "id": "api-to-rds",
-      "sources": [
-        "ecs-api"
-      ],
-      "targets": [
-        "rds-postgres"
-      ],
+      "sources": ["ecs-api"],
+      "targets": ["rds-postgres"],
       "labels": [
         {
           "text": "database-query",
@@ -567,12 +547,8 @@
     },
     {
       "id": "api-to-redis",
-      "sources": [
-        "ecs-api"
-      ],
-      "targets": [
-        "elasticache-redis"
-      ],
+      "sources": ["ecs-api"],
+      "targets": ["elasticache-redis"],
       "labels": [
         {
           "text": "cache-read",
