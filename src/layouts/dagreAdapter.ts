@@ -80,11 +80,30 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
 
   collectEdges(root);
 
+  // Helper to find a leaf node inside a container (depth-first)
+  // Used to redirect edges from container to content to avoid Dagre crashing on compound edges
+  function findLeaf(nodeId: string): string {
+    const node = nodeMap.get(nodeId);
+    if (node && node.children && node.children.length > 0) {
+        // Prefer first child? Or is there a "main" child?
+        // Just pick the first one for now.
+        return findLeaf(node.children[0].id);
+    }
+    return nodeId;
+  }
+
   allEdges.forEach(({ edge }) => {
     // Dagre only supports 1 source -> 1 target
     if (edge.sources && edge.sources.length > 0 && edge.targets && edge.targets.length > 0) {
-      const u = edge.sources[0];
-      const v = edge.targets[0];
+      let u = edge.sources[0];
+      let v = edge.targets[0];
+      
+      // EXPERIMENTAL FIX: Redirect edges to container leaves
+      // Dagre often fails with "rank" error if edges connect directly to Cluster Nodes (parents).
+      // We try to drill down to the actual leaf node inside.
+      u = findLeaf(u);
+      v = findLeaf(v);
+
       // Check if nodes exist
       if (g.hasNode(u) && g.hasNode(v)) {
         // Prevent edges to self or direct parent (Dagre constraint?)
@@ -94,6 +113,7 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
         // Check for parent/child relationship edge (often not useful in layout and can cause issues)
         const pU = parentMap.get(u);
         const pV = parentMap.get(v);
+        // Direct parent/child edges are sometimes problematic if not strictly hierarchical
         if (pU === v || pV === u) return;
 
         try {
