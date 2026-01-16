@@ -22,26 +22,38 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
   const parentMap = new Map<string, string>();
 
   function traverse(node: ElkNode, parentId?: string) {
-    nodeMap.set(node.id, node);
-
-    // If it's a container (has children), dagre generally ignores set width/height
-    // and calculates it based on children.
-    // If it's a leaf, we stick to its dimensions.
-    const isContainer = node.children && node.children.length > 0;
-    const nodeConfig: any = {
-      label: node.id
-    };
+    const isRoot = node.id === root.id;
     
-    if (!isContainer) {
-      nodeConfig.width = node.width || 80;
-      nodeConfig.height = node.height || 60;
-    }
+    // We strictly map ELK hierarchy to Dagre.
+    // However, if we make the ELK root a node in Dagre, it draws a box around everything.
+    // If we skip it, its children become top-level nodes in Dagre.
+    // Let's TRY skipping the root node itself in Dagre, only adding its children.
     
-    g.setNode(node.id, nodeConfig);
+    if (!isRoot) {
+        nodeMap.set(node.id, node);
 
-    if (parentId) {
-      g.setParent(node.id, parentId);
-      parentMap.set(node.id, parentId);
+        const isContainer = node.children && node.children.length > 0;
+        // Sanitize ID
+        if (!node.id) return; 
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const nodeConfig: any = {
+          label: node.id
+        };
+        
+        if (!isContainer) {
+          nodeConfig.width = node.width || 80;
+          nodeConfig.height = node.height || 60;
+        }
+        
+        g.setNode(node.id, nodeConfig);
+
+        // Only set parent if it is NOT the root
+        // If parentId is root.id, we don't set it in Dagre (making this node top-level)
+        if (parentId && parentId !== root.id) {
+          g.setParent(node.id, parentId);
+          parentMap.set(node.id, parentId);
+        }
     }
 
     if (node.children) {
@@ -73,18 +85,38 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
     if (edge.sources && edge.sources.length > 0 && edge.targets && edge.targets.length > 0) {
       const u = edge.sources[0];
       const v = edge.targets[0];
-      // Check if nodes exist (might be implicit/external checks or errors in generation)
+      // Check if nodes exist
       if (g.hasNode(u) && g.hasNode(v)) {
-        g.setEdge(u, v, {
-            // copy label info if needed, or maintain ID to map back
-            id: edge.id
-        });
+        // Prevent edges to self or direct parent (Dagre constraint?)
+        // Cycles in compound graphs can be tricky.
+        if (u === v) return; 
+
+        // Check for parent/child relationship edge (often not useful in layout and can cause issues)
+        const pU = parentMap.get(u);
+        const pV = parentMap.get(v);
+        if (pU === v || pV === u) return;
+
+        try {
+            g.setEdge(u, v, {
+                id: edge.id
+            });
+        } catch (e) {
+            console.warn(`Dagre failed to set edge ${u} -> ${v}`, e);
+        }
       }
     }
   });
 
   // 3. Run Layout
-  dagre.layout(g);
+  try {
+      dagre.layout(g);
+  } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // If Dagre fails, we might just fail the whole diagram or fallback to simple grid?
+      // For now, rethrow so we know it failed, but maybe wrap with context.
+      console.error('Dagre layout algorithm crashed:', msg);
+      throw new Error('Dagre layout failed: ' + msg);
+  }
 
   // 4. Update Node Positions (Convert Abs Center -> Rel TopLeft)
   // First, map get all Absolute TopLefts

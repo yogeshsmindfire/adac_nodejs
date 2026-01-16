@@ -3,7 +3,6 @@ import { ElkNode, ElkEdge } from '../types.js';
 import fs from 'fs-extra';
 
 import { layoutDagre } from '../layouts/dagreAdapter.js';
-import path from 'path';
 
 const CSS_STYLES = `
   .aws-container { fill: none; stroke-width: 2px; }
@@ -41,6 +40,47 @@ export async function renderSvg(
     // ELK Layout
     layout = (await elk.layout(graph)) as ElkNode;
   }
+
+  // --- Normalization Start ---
+  // Shift all content to top-left (padding: 20px) and resize root to fit content.
+  const padding = 20;
+  if (layout.children && layout.children.length > 0) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      // Helper to get recursive bounds relative to parent (which is root, so relative to root)
+      // Actually, we just need the bounds of the direct children in the root coordinate space.
+      // But wait, children's width/height includes their descendants? Yes, ELK/Dagre calculates container size.
+      // So we just iterate direct children of root.
+      layout.children.forEach(child => {
+         const cx = child.x || 0;
+         const cy = child.y || 0;
+         const cw = child.width || 0;
+         const ch = child.height || 0;
+         if (cx < minX) minX = cx;
+         if (cy < minY) minY = cy;
+         if (cx + cw > maxX) maxX = cx + cw;
+         if (cy + ch > maxY) maxY = cy + ch;
+      });
+
+      if (minX !== Infinity) {
+          // Shift children
+          const shiftX = -minX + padding;
+          const shiftY = -minY + padding;
+
+          layout.children.forEach(child => {
+             if (child.x !== undefined) child.x += shiftX;
+             if (child.y !== undefined) child.y += shiftY;
+          });
+
+          // Update root dimensions
+          layout.width = (maxX - minX) + (2 * padding);
+          layout.height = (maxY - minY) + (2 * padding);
+      }
+  }
+  // --- Normalization End ---
 
   const width = layout.width || 800;
   const height = layout.height || 600;

@@ -1,10 +1,10 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { generateDiagram } from '../core/generate.js';
-import { fileURLToPath } from 'url';
+// import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
 async function main() {
   const yamlsDir = path.resolve(process.cwd(), 'yamls');
@@ -29,9 +29,10 @@ async function main() {
         await generateDiagram(inputPath, elkOut, 'elk');
         reports.push({ file, engine: 'elk', status: 'success', time: Date.now() - startElk });
         console.log(`  ELK: Success`);
-    } catch (e: any) {
-        console.error(`  ELK: Failed`, e.message);
-        reports.push({ file, engine: 'elk', status: 'failure', time: Date.now() - startElk, error: e.message });
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`  ELK: Failed`, msg);
+        reports.push({ file, engine: 'elk', status: 'failure', time: Date.now() - startElk, error: msg });
     }
 
     // Test Dagre
@@ -41,9 +42,10 @@ async function main() {
         await generateDiagram(inputPath, dagreOut, 'dagre');
         reports.push({ file, engine: 'dagre', status: 'success', time: Date.now() - startDagre });
         console.log(`  Dagre: Success`);
-    } catch (e: any) {
-        console.error(`  Dagre: Failed`, e.message);
-        reports.push({ file, engine: 'dagre', status: 'failure', time: Date.now() - startDagre, error: e.message });
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`  Dagre: Failed`, msg);
+        reports.push({ file, engine: 'dagre', status: 'failure', time: Date.now() - startDagre, error: msg });
     }
   }
   
