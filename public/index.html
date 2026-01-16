@@ -287,8 +287,13 @@
             statusDiv.textContent = 'Processing...';
             output.innerHTML = '<span style="color: #666;">Processing...</span>';
 
-            // Auto open logs if not open? Maybe prefer user choice.
-            // But let's clear previous logs
+            // Auto open logs
+            if (!logsPanel.classList.contains('visible')) {
+                logsPanel.classList.add('visible');
+                toggleLogsBtn.classList.add('active');
+            }
+
+            // Clear previous logs
             logList.innerHTML = '';
             execTimeSpan.textContent = '';
             appendLog(`> Initializing generation for ${file.name}...`);
