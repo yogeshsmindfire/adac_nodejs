@@ -27,9 +27,8 @@ app.post('/api/generate', async (req, res) => {
              return;
         }
 
-        const svg = await generateDiagramSvg(content, layout);
-        res.setHeader('Content-Type', 'image/svg+xml');
-        res.status(200).send(svg);
+        const result = await generateDiagramSvg(content, layout);
+        res.status(200).json(result);
     } catch (e: any) {
         console.error('Generation failed:', e);
         res.status(500).json({ error: e.message || 'Internal Server Error' });
