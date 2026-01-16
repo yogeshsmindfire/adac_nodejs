@@ -14,7 +14,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // Serve static files from the 'public' directory
 // We are in dist/src/server.js, so public is ../../public
-const publicPath = path.join(__dirname, '..', '..', 'public');
+const publicPath = path.join(process.cwd(), 'public');
 app.use(express.static(publicPath));
 
 // API Endpoint
@@ -35,8 +35,13 @@ app.post('/api/generate', async (req, res) => {
     }
 });
 
-// Start Server
-app.listen(PORT, () => {
-    console.log(`Server is running at http://localhost:${PORT}`);
-    console.log(`Serving static files from: ${publicPath}`);
-});
+// Export app for serverless usage (e.g. Vercel)
+export default app;
+
+// Start Server only if run directly (not imported as module)
+if (import.meta.url === `file://${process.argv[1]}`) {
+    app.listen(PORT, () => {
+        console.log(`Server is running at http://localhost:${PORT}`);
+        console.log(`Serving static files from: ${publicPath}`);
+    });
+}
