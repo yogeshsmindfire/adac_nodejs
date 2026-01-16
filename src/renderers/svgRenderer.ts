@@ -1,6 +1,9 @@
 import ELK from 'elkjs';
-import { ElkNode, ElkEdge } from './types.js';
+import { ElkNode, ElkEdge } from '../types.js';
 import fs from 'fs-extra';
+
+import { layoutDagre } from '../layouts/dagreAdapter.js';
+import path from 'path';
 
 const CSS_STYLES = `
   .aws-container { fill: none; stroke-width: 2px; }
@@ -22,12 +25,22 @@ const CSS_STYLES = `
   .aws-edge { stroke: #545b64; stroke-width: 2px; fill: none; }
 `;
 
-export async function renderSvg(graph: ElkNode): Promise<string> {
+export async function renderSvg(
+  graph: ElkNode,
+  layoutEngine: 'elk' | 'dagre' = 'elk'
+): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const elk = new (ELK as any)();
 
-  // ELK Layout
-  const layout = (await elk.layout(graph)) as ElkNode;
+  // Layout Strategy
+  let layout: ElkNode;
+
+  if (layoutEngine === 'dagre') {
+    layout = await layoutDagre(graph);
+  } else {
+    // ELK Layout
+    layout = (await elk.layout(graph)) as ElkNode;
+  }
 
   const width = layout.width || 800;
   const height = layout.height || 600;

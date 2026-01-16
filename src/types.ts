@@ -38,6 +38,8 @@ export interface AdacConnection {
   id?: string;
   from: string;
   to: string;
+  source?: string; // Backwards compatibility? or deprecated
+  target?: string;
   type: string;
 }
 
@@ -47,6 +49,7 @@ export interface AdacConfig {
     clouds: AdacCloud[];
   };
   connections?: AdacConnection[];
+  layout?: 'elk' | 'dagre';
 }
 
 export interface ElkNode {

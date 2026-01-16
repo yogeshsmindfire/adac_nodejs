@@ -5,14 +5,22 @@ import AdmZip from 'adm-zip';
 import yaml from 'js-yaml';
 import { fileURLToPath } from 'url';
 
+// Calculate paths relative to current file: src/utils/iconSetup.ts(js)
+// In src: src/utils/
+// We want: src/assets and src/mappings
+// So we go up one level to src.
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DEFINITION_URL =
   'https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml';
-const ASSETS_DIR = path.join(__dirname, 'assets');
+
+// From src/utils or dist/src/utils -> ../assets
+const ASSETS_DIR = path.join(__dirname, '..', 'assets');
 const ICONS_DIR = path.join(ASSETS_DIR, 'aws-icons');
-const MAPPINGS_DIR = path.join(__dirname, 'mappings');
+// From src/utils or dist/src/utils -> ../mappings
+const MAPPINGS_DIR = path.join(__dirname, '..', 'mappings');
 const LOCAL_DEF_FILE = path.join(MAPPINGS_DIR, 'definition.yaml');
 
 async function downloadFile(url: string, dest: string) {

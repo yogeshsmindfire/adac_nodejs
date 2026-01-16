@@ -4,7 +4,7 @@ import {
   ElkEdge,
   AdacService,
   AdacApplication,
-} from './types.js';
+} from '../types.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -15,11 +15,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Adjust path to find mappings from compiled dist or src
-// If we are in src/ buildElkGraph.ts, mappings is ./mappings
-// If we are in dist/src/ buildElkGraph.js, mappings might not be copied!
-// We should rely on absolute path or robust lookup.
-// Let's try to find it relative to this file.
-const MAPPING_PATH = path.join(__dirname, 'mappings', 'icon-map.json');
+// Current file: src/graph/elkBuilder.ts
+// Mappings: src/mappings/icon-map.json
+const MAPPING_PATH = path.join(__dirname, '..', '..', 'src', 'mappings', 'icon-map.json');
 
 let ICON_MAP: Record<string, string> = {};
 
@@ -28,15 +26,21 @@ try {
   if (fs.existsSync(MAPPING_PATH)) {
     ICON_MAP = JSON.parse(fs.readFileSync(MAPPING_PATH, 'utf8'));
   } else {
-    // Try looking in src if we are in dist
-    const srcMapping = path.resolve(
+    // Try looking in dist structure: dist/src/graph/elkBuilder.js -> dist/src/mappings/
+    const distMapping = path.resolve(
       __dirname,
-      '../../src/mappings/icon-map.json'
+      '../mappings/icon-map.json'
     );
-    if (fs.existsSync(srcMapping)) {
-      ICON_MAP = JSON.parse(fs.readFileSync(srcMapping, 'utf8'));
+    if (fs.existsSync(distMapping)) {
+      ICON_MAP = JSON.parse(fs.readFileSync(distMapping, 'utf8'));
     } else {
-      console.warn('Warning: Could not find icon-map.json');
+        // Just in case it's flat in dist
+        const flatMapping = path.resolve(__dirname, '../../mappings/icon-map.json');
+        if (fs.existsSync(flatMapping)) {
+             ICON_MAP = JSON.parse(fs.readFileSync(flatMapping, 'utf8'));
+        } else {
+            console.warn(`Warning: Could not find icon-map.json at ${distMapping} or ${MAPPING_PATH}`);
+        }
     }
   }
 } catch (e) {
@@ -161,10 +165,14 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
     return undefined;
   };
 
-  const resolveAssetPath = (relativePath: string) => {
+  const resolveAssetPath = (relativePath?: string) => {
+    if (!relativePath) return undefined;
+    // console.log('Resolving:', relativePath);
+    
     // relativePath is like "aws-icons/image.png"
-    // We need absolute path.
-    // Try to find assets dir.
+    try {
+      // We need absolute path.
+      // Try to find assets dir.
     // If running from src: src/assets
     // If running from dist: src/assets (we aren't copying assets to dist usually)
 
@@ -186,6 +194,10 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
 
     // Fallback relative to CWD
     return path.resolve(process.cwd(), 'src/assets', relativePath);
+    } catch (e) {
+      console.warn('Error resolving path:', relativePath, e);
+      return undefined;
+    }
   };
 
   const getServiceType = (service: AdacService): string => {
@@ -219,7 +231,7 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
   };
 
   // 1. Create Nodes for Applications
-  adac.applications.forEach((app) => {
+  (adac.applications || []).forEach((app) => {
     const node: ElkNode = {
       id: app.id,
       width: 80,
@@ -494,8 +506,8 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
   };
 
   // Scan Infrastructure for Orphans
-  adac.infrastructure.clouds.forEach((cloud) => {
-    cloud.services.forEach((service) => {
+  (adac.infrastructure?.clouds || []).forEach((cloud) => {
+    (cloud.services || []).forEach((service) => {
       if (!placedNodeIds.has(service.id)) {
         // Try logical group first (AI)
         if (tryPlaceInLogicalGroup(nodesMap.get(service.id)!, service.ai_tags))
@@ -522,7 +534,7 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
   });
 
   // Scan Apps for Orphans
-  adac.applications.forEach((app) => {
+  (adac.applications || []).forEach((app) => {
     if (!placedNodeIds.has(app.id)) {
       if (tryPlaceInLogicalGroup(nodesMap.get(app.id)!, app.ai_tags)) return;
 
@@ -542,8 +554,13 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
 
   // 5. Edges and Implicit Nodes
   (adac.connections || []).forEach((conn) => {
+    const from = conn.from || conn.source;
+    const to = conn.to || conn.target;
+
+    if (!from || !to) return; // Skip invalid connections
+
     // Check if Endpoints exist, if not create implicit "External" nodes
-    [conn.from, conn.to].forEach((endpointId) => {
+    [from, to].forEach((endpointId) => {
       if (!nodesMap.has(endpointId)) {
         // Smart Implicit Node Detection
         let icon = getIconPath('Internet'); // Default
@@ -572,9 +589,9 @@ export function buildElkGraph(adac: AdacConfig): ElkNode {
     });
 
     edges.push({
-      id: conn.id || `${conn.from}->${conn.to}`,
-      sources: [conn.from],
-      targets: [conn.to],
+      id: conn.id || `${from}->${to}`,
+      sources: [from],
+      targets: [to],
       labels: [{ text: conn.type }],
     });
   });

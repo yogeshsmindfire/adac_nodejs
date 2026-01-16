@@ -11,6 +11,7 @@ adac_nodejs/
 ├── src/                # Core application source code
 │   ├── buildElkGraph.ts # Logic to transform ADAC model to ELK graph
 │   ├── diagram.ts       # Main orchestrator function
+│   ├── layoutDagre.ts   # Adapter for Dagre layout engine
 │   ├── mappings/        # Icon mapping definitions and assets
 │   │   ├── definition.yaml # Raw ADAC definition file
 │   │   └── icon-map.json   # Processed icon mapping
@@ -32,16 +33,29 @@ adac_nodejs/
 - **Runtime**: Node.js
 - **Language**: TypeScript
 - **CLI Framework**: [Commander.js](https://github.com/tj/commander.js)
-- **Graph Layout**: [elkjs](https://github.com/kieler/elkjs) (Eclipse Layout Kernel for JavaScript)
+- **Graph Layouts**: 
+  - [elkjs](https://github.com/kieler/elkjs) (Eclipse Layout Kernel) - *Default*
+  - [dagre](https://github.com/dagrejs/dagre) (Directed Graph Layout)
 - **YAML Parser**: [js-yaml](https://github.com/nodeca/js-yaml)
 - **File System**: [fs-extra](https://github.com/jprichardson/node-fs-extra)
 - **Utilities**:
   - `adm-zip`: For handling icon asset archives.
   - `axios`: For downloading external resources (icons).
 
+## 📊 Layout Engines
+
+You can choose between **ELK** and **Dagre** for your diagrams.
+
+| Feature | **ELK (Default)** | **Dagre** |
+| :--- | :--- | :--- |
+| **Best For** | Complex, deeply nested architectures with many containers. | Simpler, standard directed graphs (flowcharts). |
+| **Routing** | Advanced orthogonal routing. | Simple routing. |
+| **Alignment** | Port-based alignment. | Rank-based alignment. |
+
 ## 📚 Reference Links
 
 - **ELK Layout**: [https://www.eclipse.org/elk/](https://www.eclipse.org/elk/)
+- **Dagre**: [https://github.com/dagrejs/dagre](https://github.com/dagrejs/dagre)
 - **Node.js**: [https://nodejs.org/](https://nodejs.org/)
 - **Blogging/Context**: Originally inspired by "Diagrams as Code" concepts (e.g., similar to the Python `diagrams` library or Structurizr).
 
@@ -80,15 +94,32 @@ You can generate a diagram using the built CLI script.
 **Syntax:**
 
 ```bash
-node dist/bin/adac-diagram.js diagram <path-to-yaml-file> -o <path-to-output-svg>
+node dist/bin/adac-diagram.js diagram <file> [options]
 ```
 
-**Example:**
-Generate a diagram for the example web app:
+**Options:**
+- `-o, --out <path>`: Output SVG file path (default: `diagram.svg`).
+- `--layout <engine>`: Layout engine to use (`elk` or `dagre`).
 
-```bash
-node dist/bin/adac-diagram.js diagram yamls/adac_example_webapp.yaml -o output_diagrams/webapp.svg
-```
+**Examples:**
+
+1. **Default Generation (ELK):**
+   ```bash
+   node dist/bin/adac-diagram.js diagram yamls/adac_example_webapp.yaml -o output_diagrams/webapp.svg
+   ```
+
+2. **Using Dagre Layout via CLI:**
+   ```bash
+   node dist/bin/adac-diagram.js diagram yamls/test_dagre.yaml --layout dagre -o output_diagrams/test_dagre.svg
+   ```
+
+3. **Defining Layout in YAML:**
+   You can also specify the layout directly in your YAML file:
+   ```yaml
+   name: My Architecture
+   layout: dagre # or 'elk'
+   applications: ...
+   ```
 
 ### 5. Development
 
