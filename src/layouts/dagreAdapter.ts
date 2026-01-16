@@ -24,16 +24,11 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
   function traverse(node: ElkNode, parentId?: string) {
     const isRoot = node.id === root.id;
     
-    // We strictly map ELK hierarchy to Dagre.
-    // However, if we make the ELK root a node in Dagre, it draws a box around everything.
-    // If we skip it, its children become top-level nodes in Dagre.
-    // Let's TRY skipping the root node itself in Dagre, only adding its children.
-    
+    // Skip root node in Dagre to avoid a top-level bounding box
     if (!isRoot) {
         nodeMap.set(node.id, node);
 
         const isContainer = node.children && node.children.length > 0;
-        // Sanitize ID
         if (!node.id) return; 
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,8 +43,6 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
         
         g.setNode(node.id, nodeConfig);
 
-        // Only set parent if it is NOT the root
-        // If parentId is root.id, we don't set it in Dagre (making this node top-level)
         if (parentId && parentId !== root.id) {
           g.setParent(node.id, parentId);
           parentMap.set(node.id, parentId);
@@ -65,8 +58,6 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
   traverse(root);
 
   // 2. Add Edges
-  // Edges in ELK can be at multiple levels, but in our current buildElkGraph they are mostly at root.
-  // We need to find all edges.
   const allEdges: { edge: ElkEdge, containerId?: string }[] = [];
 
   function collectEdges(node: ElkNode) {
@@ -80,41 +71,54 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
 
   collectEdges(root);
 
-  // Helper to find a leaf node inside a container (depth-first)
-  // Used to redirect edges from container to content to avoid Dagre crashing on compound edges
-  function findLeaf(nodeId: string): string {
+  // Helper: create or retrieve an anchor node for a container to prevent Dagre crashes
+  // We place a 0-size "anchor" node inside the container and route edges to it.
+  const anchorMap = new Map<string, string>();
+  
+  function getAnchor(nodeId: string): string {
     const node = nodeMap.get(nodeId);
     if (node && node.children && node.children.length > 0) {
-        // Prefer first child? Or is there a "main" child?
-        // Just pick the first one for now.
-        return findLeaf(node.children[0].id);
+        if (anchorMap.has(nodeId)) {
+            return anchorMap.get(nodeId)!;
+        }
+        
+        const anchorId = `${nodeId}__anchor`;
+        g.setNode(anchorId, { 
+            label: '', 
+            width: 0, 
+            height: 0,
+            dummy: true 
+        });
+        g.setParent(anchorId, nodeId);
+        
+        anchorMap.set(nodeId, anchorId);
+        return anchorId;
     }
     return nodeId;
+  }
+
+  // Helper: check ancestor relationship
+  function isAncestor(ancestor: string, node: string): boolean {
+      let curr = parentMap.get(node);
+      while (curr) {
+          if (curr === ancestor) return true;
+          curr = parentMap.get(curr);
+      }
+      return false;
   }
 
   allEdges.forEach(({ edge }) => {
     // Dagre only supports 1 source -> 1 target
     if (edge.sources && edge.sources.length > 0 && edge.targets && edge.targets.length > 0) {
-      let u = edge.sources[0];
-      let v = edge.targets[0];
+      const uOrig = edge.sources[0];
+      const vOrig = edge.targets[0];
       
-      // EXPERIMENTAL FIX: Redirect edges to container leaves
-      // Dagre often fails with "rank" error if edges connect directly to Cluster Nodes (parents).
-      // We try to drill down to the actual leaf node inside.
-      u = findLeaf(u);
-      v = findLeaf(v);
+      const u = getAnchor(uOrig);
+      const v = getAnchor(vOrig);
 
-      // Check if nodes exist
       if (g.hasNode(u) && g.hasNode(v)) {
-        // Prevent edges to self or direct parent (Dagre constraint?)
-        // Cycles in compound graphs can be tricky.
         if (u === v) return; 
-
-        // Check for parent/child relationship edge (often not useful in layout and can cause issues)
-        const pU = parentMap.get(u);
-        const pV = parentMap.get(v);
-        // Direct parent/child edges are sometimes problematic if not strictly hierarchical
-        if (pU === v || pV === u) return;
+        if (isAncestor(u, v) || isAncestor(v, u)) return;
 
         try {
             g.setEdge(u, v, {
@@ -132,14 +136,11 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
       dagre.layout(g);
   } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      // If Dagre fails, we might just fail the whole diagram or fallback to simple grid?
-      // For now, rethrow so we know it failed, but maybe wrap with context.
       console.error('Dagre layout algorithm crashed:', msg);
       throw new Error('Dagre layout failed: ' + msg);
   }
 
-  // 4. Update Node Positions (Convert Abs Center -> Rel TopLeft)
-  // First, map get all Absolute TopLefts
+  // 4. Update Node Positions
   const absPos = new Map<string, { x: number, y: number }>();
   
   g.nodes().forEach(v => {
@@ -149,7 +150,7 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
             x: nodeFn.x - nodeFn.width / 2,
             y: nodeFn.y - nodeFn.height / 2
         });
-        // Update dimensions in elkNode while we are here, as Dagre might have resized containers
+        // Update dimensions in elkNode as Dagre might have resized containers
         const elkNode = nodeMap.get(v);
         if (elkNode) {
             elkNode.width = nodeFn.width;
@@ -158,7 +159,6 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
     }
   });
 
-  // Now set x,y relative to parent
   g.nodes().forEach(v => {
     const elkNode = nodeMap.get(v);
     if (elkNode && absPos.has(v)) {
@@ -170,7 +170,6 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
             elkNode.x = myAbs.x - parentAbs.x;
             elkNode.y = myAbs.y - parentAbs.y;
         } else {
-            // No parent, relative is absolute
             elkNode.x = myAbs.x;
             elkNode.y = myAbs.y;
         }
@@ -178,34 +177,114 @@ export async function layoutDagre(root: ElkNode): Promise<ElkNode> {
   });
 
   // 5. Update Edge Paths
-  // We need to map back to the original edge objects.
-  // Since we flattened edges to add them, we iterate our flattened list.
   allEdges.forEach(({ edge, containerId }) => {
       const u = edge.sources[0];
       const v = edge.targets[0];
-      if (g.hasNode(u) && g.hasNode(v)) {
-          const dagreEdge = g.edge(u, v);
+      
+      // Use original IDs to look up the Dagre edge (which might be between anchors)
+      const uAnchor = getAnchor(u);
+      const vAnchor = getAnchor(v);
+
+      if (g.hasNode(uAnchor) && g.hasNode(vAnchor)) {
+          const dagreEdge = g.edge(uAnchor, vAnchor);
           if (dagreEdge && dagreEdge.points) {
-              // Convert Dagre absolute points to relative to container
               let offsetX = 0;
               let offsetY = 0;
               
               const cId = containerId || root.id;
               if (cId && absPos.has(cId)) {
                   const cAbs = absPos.get(cId)!;
-                  // SVG renderer adds container's absolute position (accumulated relative positions)
-                  // Dagre points are already absolute.
-                  // So we must subtract container's absolute position.
-                  // Note: absPos here is Top-Left of the node/container.
-                  // renderSvg uses Top-Left offsets.
                   offsetX = cAbs.x;
                   offsetY = cAbs.y;
               }
 
-              const points = dagreEdge.points.map(p => ({
+              let points = dagreEdge.points.map(p => ({
                   x: p.x - offsetX,
                   y: p.y - offsetY
               }));
+
+              // Edge Clipping to Node Borders
+              const getNodeBox = (id: string, relativeToX: number, relativeToY: number) => {
+                  let realId = id;
+                  if (id.endsWith('__anchor')) {
+                      realId = id.replace('__anchor', '');
+                  }
+                  
+                  if (absPos.has(realId)) {
+                      const abs = absPos.get(realId)!;
+                      const n = nodeMap.get(realId);
+                      if (n) {
+                          return {
+                              x: abs.x - relativeToX,
+                              y: abs.y - relativeToY,
+                              width: n.width || 0,
+                              height: n.height || 0
+                          };
+                      }
+                  }
+                  return null;
+              };
+
+              // Simplified Ray-Box intersection
+              const intersectRect = (p1: {x:number, y:number}, p2: {x:number, y:number}, rect: {x:number, y:number, width:number, height:number}) => {
+                  const dx = p2.x - p1.x;
+                  const dy = p2.y - p1.y;
+                  if (dx === 0 && dy === 0) return p2;
+
+                  const minX = rect.x;
+                  const maxX = rect.x + rect.width;
+                  const minY = rect.y;
+                  const maxY = rect.y + rect.height;
+
+                  let bestT = Infinity;
+                  
+                  const check = (t: number) => {
+                      if (t >= 0 && t <= 1) {
+                        const ix = p1.x + t * dx;
+                        const iy = p1.y + t * dy;
+                        const epsilon = 0.1;
+                        if (ix >= minX-epsilon && ix <= maxX+epsilon && iy >= minY-epsilon && iy <= maxY+epsilon) {
+                             if (t < bestT) bestT = t;
+                        }
+                      }
+                  };
+                  
+                  if (dx !== 0) {
+                      check((minX - p1.x) / dx);
+                      check((maxX - p1.x) / dx);
+                  }
+                  if (dy !== 0) {
+                      check((minY - p1.y) / dy);
+                      check((maxY - p1.y) / dy);
+                  }
+
+                  if (bestT !== Infinity && bestT < 1) {
+                      return {
+                          x: p1.x + bestT * dx,
+                          y: p1.y + bestT * dy
+                      };
+                  }
+
+                  return p2;
+              };
+
+              // Clip Start
+              if (points.length > 1) {
+                  const box = getNodeBox(uAnchor, offsetX, offsetY);
+                  if (box) {
+                      // Trace backwards from P2 to P1 to find exit point
+                      points[0] = intersectRect(points[1], points[0], box);
+                  }
+              }
+
+              // Clip End
+              if (points.length > 1) {
+                  const box = getNodeBox(vAnchor, offsetX, offsetY);
+                  if (box) {
+                      // Trace from P_prev to P_end
+                      points[points.length - 1] = intersectRect(points[points.length - 2], points[points.length - 1], box);
+                  }
+              }
 
               edge.sections = [{
                   startPoint: points[0],

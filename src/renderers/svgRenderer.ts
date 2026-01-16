@@ -50,10 +50,6 @@ export async function renderSvg(
       let maxX = -Infinity;
       let maxY = -Infinity;
 
-      // Helper to get recursive bounds relative to parent (which is root, so relative to root)
-      // Actually, we just need the bounds of the direct children in the root coordinate space.
-      // But wait, children's width/height includes their descendants? Yes, ELK/Dagre calculates container size.
-      // So we just iterate direct children of root.
       layout.children.forEach(child => {
          const cx = child.x || 0;
          const cy = child.y || 0;
@@ -66,7 +62,6 @@ export async function renderSvg(
       });
 
       if (minX !== Infinity) {
-          // Shift children
           const shiftX = -minX + padding;
           const shiftY = -minY + padding;
 
@@ -75,7 +70,6 @@ export async function renderSvg(
              if (child.y !== undefined) child.y += shiftY;
           });
 
-          // Update root dimensions
           layout.width = (maxX - minX) + (2 * padding);
           layout.height = (maxY - minY) + (2 * padding);
       }
