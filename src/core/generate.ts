@@ -61,6 +61,6 @@ export async function generateDiagram(
   const raw = await fs.readFile(input, 'utf8');
   const { svg } = await generateDiagramSvg(raw, layoutOverride);
 
-  await fs.writeFile(output, svg);
+  await fs.outputFile(output, svg);
   console.log(`✅ Diagram generated: ${output}`);
 }

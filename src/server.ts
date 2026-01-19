@@ -39,7 +39,7 @@ app.post('/api/generate', async (req, res) => {
 export default app;
 
 // Start Server only if run directly (not imported as module)
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (path.resolve(fileURLToPath(import.meta.url)) === path.resolve(process.argv[1])) {
     app.listen(PORT, () => {
         console.log(`Server is running at http://localhost:${PORT}`);
         console.log(`Serving static files from: ${publicPath}`);
